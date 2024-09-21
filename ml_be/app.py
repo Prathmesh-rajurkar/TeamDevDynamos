@@ -55,6 +55,7 @@ def scrape_wired(category):
     # Prepare a list to hold the scraped data
     news_data = []
 
+    i=0
     # Loop through each article and extract the relevant information
     for article in articles:
         title = article.find('h3',class_="SummaryItemHedBase-hiFYpQ").get_text() if article.find('h3',class_="SummaryItemHedBase-hiFYpQ") else 'No Title'
@@ -62,9 +63,9 @@ def scrape_wired(category):
         # Extract the image URL from the 'ResponsiveImageContainer-eybHBd' class
         image_container = article.find('img', class_='ResponsiveImageContainer-eybHBd')
         image_url = image_container['src'] if image_container and image_container['src'] else 'No Image'
-
         # Append the article details to the list
         db.articles.insert_one({
+            "uid":i,
             "category":category,
             "title": title,
             "summary": summary,
@@ -76,6 +77,7 @@ def scrape_wired(category):
             "summary": summary,
             "image": image_url
         })
+        i=i+1
 
     return news_data
 
@@ -116,6 +118,7 @@ def get_articles():
         id = json_util.dumps(article.get('_id'))
         articles_list.append({
             'id': str(article.get('_id')),
+            'uid': article.get('uid'),
             'title': article.get('title', 'No Title'),
             'summary': article.get('summary', 'No Summary'),
             'image': article.get('image', 'No Image'),
@@ -141,26 +144,26 @@ def get_articles_by_category(category):
 
     return jsonify(articles_list)
 
-@app.route(f'/api/articles/<article_id>/like', methods=['POST'])
-def update_likes(article_id):
+@app.route('/api/articles/like/<uid>', methods=['POST'])
+def update_likes(uid):
     try:
         # Convert the article_id from string to ObjectId
         # article_obj_id = ObjectId(article_id)
 
         # Find the article and increment the 'likes' field by 1
         db.articles.update_one(
-            {'_id': ObjectId(article_id)},
+            {'uid': uid},
             {'$inc': {'likes': 1}}  # Increment the 'likes' field by 1
         )
         
         # Fetch the updated article to return in the response
-        updated_article = db.articles.find_one({'_id': article_obj_id})
+        updated_article = db.articles.find_one({'uid': uid})
         
         # Return the updated article data
         return jsonify({
             '_id': str(updated_article.get('_id')),
             'title': updated_article.get('title'),
-            'likes': updated_article.get('likes', 0)  # Return updated likes
+            'likes': updated_article.get('likes', 1)  # Return updated likes
         }), 200
 
     except Exception as e:
@@ -185,27 +188,31 @@ def get_liked_articles():
 @app.route('/api/articles/recommend', methods=['POST'])
 def recommend_news():
     try:
-        # Get the article the user read from the request data
-        user_read_article_id = request.json.get('article_id')
-        if not user_read_article_id:
-            return jsonify({'error': 'Article ID is required'}), 400
 
-        # Find the user's read article from MongoDB
-        user_read_article = db.articles.find_one({'_id': ObjectId(user_read_article_id)})
-        if not user_read_article:
-            return jsonify({'error': 'Article not found'}), 404
-
-        # Convert the MongoDB article to the format used in the recommendation system
-        user_read_article = {
-            '_id': str(user_read_article.get('_id')),
-            'title': user_read_article.get('title', 'No Title'),
-            'summary': user_read_article.get('summary', 'No Summary'),
-            'image': user_read_article.get('image', 'No Image'),
-            'likes': user_read_article.get('likes', 0)
+        user_read_article ={
+        "id": "66ee9bdddb32112e0c2717eb",
+        "image": "https://media.wired.com/photos/66eda2dfa7f74cd700e60b9f/16:9/pass/Apple-Store-Protests-Business-2173253426.jpg",
+        "likes": 0,
+        "summary": "Calling for Apple to break its silence on the ongoing war in Gaza and to rid so-called blood minerals from its supply chain, protesters stood outside over a dozen Apple Stores around the world Friday.",
+        "title": "Protesters Take to Apple Stores Worldwide on iPhone 16 Launch Day",
+        "uid": 0
         }
 
         # Get all articles (including liked ones)
-        all_articles = get_all_articles()
+        all_articles = db.articles.find()  # Retrieve all articles from the MongoDB collection
+        articles_list = []
+    
+    # Iterate through MongoDB documents and prepare the data to return
+        for article in articles:
+            id = json_util.dumps(article.get('_id'))
+            articles_list.append({
+                'id': str(article.get('_id')),
+                'uid': article.get('uid'),
+                'title': article.get('title', 'No Title'),
+                'summary': article.get('summary', 'No Summary'),
+                'image': article.get('image', 'No Image'),
+                'likes': article.get('likes',0)
+            })
 
         # Get recommended articles
         recommended_articles = recommend_articles(user_read_article, all_articles)

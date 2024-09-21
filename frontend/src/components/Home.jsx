@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Heart } from "lucide-react";
 import axios from 'axios';
 const ARTICLES_API_URL = "http://localhost:5000/api/articles";
+const RECOMMENDED_ARTICLES = "http://127.0.0.1:5000/api/articles/recommend"
 const LIKES_API_URL = "http://localhost:5000/api/articles/like";
 
 
@@ -37,6 +38,10 @@ function Home() {
         const fetchArticles = async () => {
             try {
                 const response = await axios.get(ARTICLES_API_URL); // Replace with your API URL
+                const res_rec = await axios.get(RECOMMENDED_ARTICLES); // Replace with your API URL
+                if (res_rec.data != []) {
+                    setNews(res_rec.data)
+                }
                 setNews(response.data.slice(0, 20)); // Get the first 20 articles
                 console.log(news);
                 
@@ -45,23 +50,26 @@ function Home() {
             } finally {
                 setLoading(false); // Set loading to false once the fetch is complete
             }
+
+           
         };
 
         fetchArticles();
-    }, []);
+    }, [useState]);
 
-    const handleLike = async (id) => {
+    const handleLike = async (uid) => {
         try {
-            id = `ObjectID(${id})`;
-            // Update the likes on the server
-            await axios.post(`/api/articles/${id}/like`, { id }); // Adjust the URL and payload as necessary
             
-            // Update the local state
             setNews((prevNews) =>
                 prevNews.map((article) =>
-                    article.id === id ? { ...article, likes: article.likes + 1 } : article
+                    article.uid === uid ? { ...article, likes: (article.likes == 0)?1:0 } : article
                 )
             );
+            
+            // Update the likes on the server
+            await axios.post(`http://localhost:5000/api/articles/like/${uid}`, {uid}); 
+            
+            // Update the local state
         } catch (err) {
             console.error('Error liking article:', err);
             // Optionally handle error feedback to the user
@@ -91,7 +99,7 @@ function Home() {
         <div className="">
             
           {news.map((article) => (
-            <Card key={article.id} className="flex flex-col m-10">
+            <Card key={article.uid} className="flex flex-col m-10">
               <CardHeader>
                 <CardTitle className="text-2xl text-start">{article.title}</CardTitle>
               </CardHeader>
@@ -108,9 +116,9 @@ function Home() {
                   variant="ghost"
                   size="sm"
                   className="flex items-center gap-2"
-                  onClick={() => handleLike(article.id)}
+                  onClick={() => handleLike(article.uid)}
                 >
-                  <Heart className="h-4 w-4" />
+                  <Heart className="h-4 w-4 " />
                   <span>{article.likes}</span>
                 </Button>
               </CardFooter>
