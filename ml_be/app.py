@@ -5,6 +5,8 @@ from bs4 import BeautifulSoup
 # from ml_be.recommend import recommend_articles
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
+from flask_cors import CORS
+from bson import ObjectId , json_util
 
 def recommend_articles(user_read_article, all_articles):
     # Extract titles and summaries for vectorization
@@ -32,6 +34,7 @@ def recommend_articles(user_read_article, all_articles):
     return recommended_articles
 
 app = Flask(__name__)
+CORS(app, resources={r"/api/*": {"origins": "http://localhost:5173"}})
 client = MongoClient('mongodb+srv://prathmeshrajurkar199:sryzt5xxUfQC9PWR@newsaggregator.crblc.mongodb.net/')
 db = client.newsaggregator 
 # Function to scrape news articles from Wired's Security Category
@@ -107,15 +110,18 @@ def get_wired_culture():
 def get_articles():
     articles = db.articles.find()  # Retrieve all articles from the MongoDB collection
     articles_list = []
-
+    i=0
     # Iterate through MongoDB documents and prepare the data to return
     for article in articles:
+        id = json_util.dumps(article.get('_id'))
         articles_list.append({
+            'id': str(article.get('_id')),
             'title': article.get('title', 'No Title'),
             'summary': article.get('summary', 'No Summary'),
             'image': article.get('image', 'No Image'),
             'likes': article.get('likes',0)
         })
+        i=i+1
 
     return jsonify(articles_list)  # Return the data in JSON format
 
@@ -135,15 +141,15 @@ def get_articles_by_category(category):
 
     return jsonify(articles_list)
 
-@app.route('/api/articles/<article_id>/like', methods=['POST'])
+@app.route(f'/api/articles/<article_id>/like', methods=['POST'])
 def update_likes(article_id):
     try:
         # Convert the article_id from string to ObjectId
-        article_obj_id = ObjectId(article_id)
+        # article_obj_id = ObjectId(article_id)
 
         # Find the article and increment the 'likes' field by 1
         db.articles.update_one(
-            {'_id': article_obj_id},
+            {'_id': ObjectId(article_id)},
             {'$inc': {'likes': 1}}  # Increment the 'likes' field by 1
         )
         
@@ -167,7 +173,7 @@ def get_liked_articles():
     
     for article in liked_articles:
         articles_list.append({
-            '_id': str(article.get('_id')),
+            '_id': str(ObjectId(article.get('_id'))),
             'title': article.get('title', 'No Title'),
             'summary': article.get('summary', 'No Summary'),
             'image': article.get('image', 'No Image'),
@@ -209,6 +215,11 @@ def recommend_news():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+
+db.articles.update_one(
+            {'_id': "ObjectID(66ee737787e46be19a8a3d06)"},
+            {'$inc': {'likes': 1}}  # Increment the 'likes' field by 1
+        )
 
 
 # Run the Flask app
